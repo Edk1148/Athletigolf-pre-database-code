@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type FairwayResult = "hit" | "left" | "right" | "miss" | "na";
 
@@ -29,6 +30,8 @@ export default function RoundTracker() {
   const [date, setDate] = useState("");
   const [holes, setHoles] = useState<Hole[]>(defaultHoles);
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const updateHole = (
     index: number,
@@ -118,6 +121,29 @@ export default function RoundTracker() {
     setDate("");
     setHoles(defaultHoles);
     setSubmitted(false);
+    setSaveError("");
+  };
+
+  const finishRound = async () => {
+    setSaving(true);
+    setSaveError("");
+    const { error } = await supabase.from("rounds").insert({
+      course: course || null,
+      date: date || null,
+      score: stats.totalScore || null,
+      fairways_hit: stats.fairwaysHit || null,
+      greens_in_regulation: stats.girs || null,
+      putts: stats.totalPutts || null,
+      scramble_percentage: null,
+      is_competition: competition,
+      notes: teeColour ? `Tee colour: ${teeColour}` : null,
+    });
+    setSaving(false);
+    if (error) {
+      setSaveError(error.message);
+      return;
+    }
+    setSubmitted(true);
   };
 
   if (submitted) {
@@ -346,11 +372,18 @@ export default function RoundTracker() {
           </table>
         </div>
 
+        {saveError && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+            {saveError}
+          </div>
+        )}
+
         <button
-          onClick={() => setSubmitted(true)}
-          className="mt-8 w-full rounded-xl bg-[#1F4D3A] py-4 text-white transition hover:scale-[1.01] md:w-auto md:px-10"
+          onClick={finishRound}
+          disabled={saving}
+          className="mt-8 w-full rounded-xl bg-[#1F4D3A] py-4 text-white transition hover:scale-[1.01] disabled:opacity-50 md:w-auto md:px-10"
         >
-          Finish Round
+          {saving ? "Saving..." : "Finish Round"}
         </button>
       </div>
     </div>

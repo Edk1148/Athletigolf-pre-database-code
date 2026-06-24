@@ -1,58 +1,78 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { SplitDay } from "@/lib/types";
 
-type SplitDay = {
+type SplitDayState = {
+  id?: string;
   day: string;
   focus: string;
   exercises: string[];
 };
 
+const defaultSplit: SplitDayState[] = [
+  { day: "Monday", focus: "Push", exercises: ["Bench Press", "Incline DB Press", "Shoulder Press", "Tricep Pushdown"] },
+  { day: "Tuesday", focus: "Pull", exercises: ["Lat Pulldown", "Rows", "Rear Delts", "Incline Curls"] },
+  { day: "Wednesday", focus: "Legs", exercises: ["Squats", "Leg Press", "Leg Curls", "Calf Raises"] },
+  { day: "Thursday", focus: "Rest", exercises: ["Mobility", "Stretching", "Light Cardio"] },
+  { day: "Friday", focus: "Upper", exercises: ["Machine Press", "Pulldown", "Lateral Raises", "Arms"] },
+  { day: "Saturday", focus: "Lower", exercises: ["Leg Extension", "RDL", "Hamstring Curl", "Calves"] },
+  { day: "Sunday", focus: "Rest", exercises: ["Recovery", "Walk", "Mobility"] },
+];
+
 export default function CreateSplit() {
-  const [split, setSplit] = useState<SplitDay[]>([
-    {
-      day: "Monday",
-      focus: "Push",
-      exercises: [
-        "Bench Press",
-        "Incline DB Press",
-        "Shoulder Press",
-        "Tricep Pushdown",
-      ],
-    },
-    {
-      day: "Tuesday",
-      focus: "Pull",
-      exercises: ["Lat Pulldown", "Rows", "Rear Delts", "Incline Curls"],
-    },
-    {
-      day: "Wednesday",
-      focus: "Legs",
-      exercises: ["Squats", "Leg Press", "Leg Curls", "Calf Raises"],
-    },
-    {
-      day: "Thursday",
-      focus: "Rest",
-      exercises: ["Mobility", "Stretching", "Light Cardio"],
-    },
-    {
-      day: "Friday",
-      focus: "Upper",
-      exercises: ["Machine Press", "Pulldown", "Lateral Raises", "Arms"],
-    },
-    {
-      day: "Saturday",
-      focus: "Lower",
-      exercises: ["Leg Extension", "RDL", "Hamstring Curl", "Calves"],
-    },
-    {
-      day: "Sunday",
-      focus: "Rest",
-      exercises: ["Recovery", "Walk", "Mobility"],
-    },
-  ]);
+  const [split, setSplit] = useState<SplitDayState[]>(defaultSplit);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedMessage, setSavedMessage] = useState("");
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editFocus, setEditFocus] = useState("");
   const [editExercises, setEditExercises] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadSplit();
+  }, []);
+
+  const loadSplit = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("split_days")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (data && data.length > 0) {
+      const loaded = (data as SplitDay[]).map((d) => ({
+        id: d.id,
+        day: d.day_name || "",
+        focus: d.split_name || "",
+        exercises: d.exercises || [],
+      }));
+      setSplit(loaded);
+    }
+    setLoading(false);
+  };
+
+  const saveAll = async () => {
+    setSaving(true);
+    setSavedMessage("");
+
+    await supabase.from("split_days").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+    const rows = split.map((day) => ({
+      day_name: day.day,
+      split_name: day.focus,
+      exercises: day.exercises,
+    }));
+
+    const { error } = await supabase.from("split_days").insert(rows);
+    setSaving(false);
+
+    if (!error) {
+      setSavedMessage("Split saved successfully");
+      setTimeout(() => setSavedMessage(""), 3000);
+      loadSplit();
+    }
+  };
 
   const openEditor = (index: number) => {
     setEditingIndex(index);
@@ -99,6 +119,14 @@ export default function CreateSplit() {
 
   const editingDay = editingIndex !== null ? split[editingIndex] : null;
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <div className="text-black/40 text-lg">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-cream p-8 md:p-12">
       <div className="mx-auto max-w-7xl">
@@ -122,14 +150,14 @@ export default function CreateSplit() {
             <button
               key={day.day}
               onClick={() => openEditor(index)}
-             className="flex h-full min-h-[390px] flex-col rounded-[2rem] border border-[#7A1F1F]/10 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              className="flex h-full min-h-[390px] flex-col rounded-[2rem] border border-[#7A1F1F]/10 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
             >
               <div className="mb-5 rounded-2xl bg-[#7A1F1F] p-4 text-white">
                 <p className="text-sm text-white/60">{day.day}</p>
                 <h2 className="text-2xl font-semibold">{day.focus}</h2>
               </div>
 
-             <div className="flex-1 space-y-3">
+              <div className="flex-1 space-y-3">
                 {day.exercises.length > 0 ? (
                   day.exercises.map((exercise, i) => (
                     <div
@@ -151,15 +179,30 @@ export default function CreateSplit() {
           ))}
         </div>
 
-        <div className="mt-10 rounded-[2rem] border border-[#7A1F1F]/10 bg-white p-6 shadow-sm">
-          <p className="mb-2 text-sm text-[#7A1F1F]/70">Tip</p>
-          <h2 className="mb-2 text-2xl font-semibold">
-            Make your split match your week
-          </h2>
-          <p className="text-black/60">
-            Put your actual training days in here, then later this can link
-            directly to Submit Workout.
-          </p>
+        <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="rounded-[2rem] border border-[#7A1F1F]/10 bg-white p-6 shadow-sm flex-1">
+            <p className="mb-2 text-sm text-[#7A1F1F]/70">Tip</p>
+            <h2 className="mb-2 text-2xl font-semibold">
+              Make your split match your week
+            </h2>
+            <p className="text-black/60">
+              Put your actual training days in here, then later this can link
+              directly to Submit Workout.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {savedMessage && (
+              <p className="text-sm font-medium text-[#1F4D3A]">{savedMessage}</p>
+            )}
+            <button
+              onClick={saveAll}
+              disabled={saving}
+              className="rounded-2xl bg-[#7A1F1F] px-8 py-4 text-white font-semibold transition hover:scale-[1.02] disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Split"}
+            </button>
+          </div>
         </div>
       </div>
 

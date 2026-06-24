@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const GYM_RED = "#7A1F1F";
 
@@ -23,6 +24,8 @@ export default function SubmitSession() {
   const [selectedDay, setSelectedDay] = useState("");
   const [exercises, setExercises] = useState<ExerciseLog[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const selectDay = (day: string) => {
     setSelectedDay(day);
@@ -68,7 +71,20 @@ export default function SubmitSession() {
     setExercises((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const submitSession = () => {
+  const submitSession = async () => {
+    setSaving(true);
+    setSaveError("");
+    const { error } = await supabase.from("workouts").insert({
+      date: new Date().toLocaleDateString("en-GB"),
+      workout_name: selectedDay,
+      exercises: exercises.filter((e) => e.name.trim() !== ""),
+      notes: null,
+    });
+    setSaving(false);
+    if (error) {
+      setSaveError(error.message);
+      return;
+    }
     setSubmitted(true);
   };
 
@@ -205,10 +221,17 @@ export default function SubmitSession() {
 
             <button
               onClick={submitSession}
-              className="mt-8 rounded-full bg-[#7A1F1F] px-8 py-4 text-white transition hover:scale-105"
+              disabled={saving}
+              className="mt-8 rounded-full bg-[#7A1F1F] px-8 py-4 text-white transition hover:scale-105 disabled:opacity-50"
             >
-              Submit Session
+              {saving ? "Saving..." : "Submit Session"}
             </button>
+
+            {saveError && (
+              <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
+                {saveError}
+              </div>
+            )}
 
             {submitted && (
               <div className="mt-6 rounded-2xl border border-[#7A1F1F]/10 bg-[#7A1F1F]/5 p-5">

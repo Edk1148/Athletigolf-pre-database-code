@@ -18,7 +18,7 @@ export default function AuthPage() {
       if (isLogin) {
         await signIn(email, password);
       } else {
-        await signUp(email, password);
+        await signUp(email, password, username);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Authentication failed";

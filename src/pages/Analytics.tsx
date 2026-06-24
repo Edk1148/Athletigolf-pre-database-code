@@ -1,10 +1,100 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { Round, Workout } from "@/lib/types";
+
 export default function Analytics() {
+  const [rounds, setRounds] = useState<Round[]>([]);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    const { data: roundsData } = await supabase
+      .from("rounds")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setRounds((roundsData as Round[]) || []);
+
+    const { data: workoutsData } = await supabase
+      .from("workouts")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setWorkouts((workoutsData as Workout[]) || []);
+    setLoading(false);
+  };
+
+  const roundsWithScores = rounds.filter((r) => r.score !== null);
+  const avgScore =
+    roundsWithScores.length > 0
+      ? (
+          roundsWithScores.reduce((sum, r) => sum + (r.score || 0), 0) /
+          roundsWithScores.length
+        ).toFixed(1)
+      : "-";
+
+  const workoutsThisWeek = (() => {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return workouts.filter((w) => {
+      if (!w.date) return false;
+      const d = new Date(w.date.split("/").reverse().join("-"));
+      return d >= weekAgo;
+    }).length;
+  })();
+
+  const avgFairways =
+    rounds.length > 0
+      ? Math.round(
+          rounds.reduce((sum, r) => sum + (r.fairways_hit || 0), 0) /
+            rounds.length
+        )
+      : 0;
+
+  const avgGir =
+    rounds.length > 0
+      ? Math.round(
+          rounds.reduce((sum, r) => sum + (r.greens_in_regulation || 0), 0) /
+            rounds.length
+        )
+      : 0;
+
+  const avgScramble =
+    rounds.length > 0
+      ? Math.round(
+          rounds.reduce((sum, r) => sum + (r.scramble_percentage || 0), 0) /
+            rounds.length
+        )
+      : 0;
+
+  const avgPutts =
+    rounds.length > 0
+      ? (
+          rounds.reduce((sum, r) => sum + (r.putts || 0), 0) / rounds.length
+        ).toFixed(1)
+      : "-";
+
+  const recentScores = roundsWithScores
+    .slice(0, 5)
+    .reverse()
+    .map((r) => r.score || 0);
+
   const topStats = [
-    ["Handicap", "12.4"],
-    ["Avg Score", "78.6"],
-    ["Workouts / Week", "5"],
-    ["Driving Distance", "262y"],
+    ["Avg Score", avgScore],
+    ["Workouts / Week", workoutsThisWeek.toString()],
+    ["Rounds Logged", rounds.length.toString()],
+    ["Workouts Logged", workouts.length.toString()],
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <div className="text-black/40 text-lg">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cream p-8 md:p-12">
@@ -51,16 +141,24 @@ export default function Analytics() {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                title: "+11 Yards",
-                text: "Driving distance increased during periods of consistent leg training."
+                title: rounds.length > 0 ? `${avgScore} Avg Score` : "Start Logging",
+                text: rounds.length > 0
+                  ? `Your average score across ${rounds.length} logged rounds.`
+                  : "Log rounds to start seeing performance insights.",
               },
               {
-                title: "Best Scoring Weeks",
-                text: "Your lowest scores occur after completing 4+ workouts."
+                title: workouts.length > 0 ? `${workouts.length} Workouts` : "Track Workouts",
+                text: workouts.length > 0
+                  ? `You've logged ${workouts.length} gym sessions total.`
+                  : "Submit workouts to track your gym progression.",
               },
               {
-                title: "Biggest Opportunity",
-                text: "Approach play remains the largest contributor to dropped shots."
+                title: rounds.length > 0 ? "Biggest Opportunity" : "Get Started",
+                text: rounds.length > 0
+                  ? avgGir < 60
+                    ? "Approach play remains the largest contributor to dropped shots."
+                    : "Keep maintaining your greens in regulation percentage."
+                  : "Log rounds and workouts to unlock personalised insights.",
               },
             ].map((item, index) => (
               <div
@@ -91,21 +189,27 @@ export default function Analytics() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-5 gap-4 items-end h-56">
-            {[82, 80, 79, 78, 76].map((score, index) => (
-              <div
-                key={index}
-                className="flex flex-col items-center gap-3"
-              >
+          {recentScores.length > 0 ? (
+            <div className="grid grid-cols-5 gap-4 items-end h-56">
+              {recentScores.map((score, index) => (
                 <div
-                  className="w-full rounded-t-2xl bg-[#1F4D3A]"
-                  style={{ height: `${(90 - score) * 10}px` }}
-                />
+                  key={index}
+                  className="flex flex-col items-center gap-3"
+                >
+                  <div
+                    className="w-full rounded-t-2xl bg-[#1F4D3A]"
+                    style={{ height: `${(100 - score) * 4}px` }}
+                  />
 
-                <p className="font-semibold">{score}</p>
-              </div>
-            ))}
-          </div>
+                  <p className="font-semibold">{score}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-56 flex items-center justify-center text-black/40">
+              No rounds logged yet
+            </div>
+          )}
         </section>
 
         {/* GOLF + GYM */}
@@ -119,10 +223,10 @@ export default function Analytics() {
 
             <div className="space-y-8">
               {[
-                ["Driving Accuracy", "65%"],
-                ["Greens in Regulation", "56%"],
-                ["Scrambling", "47%"],
-                ["Putting", "72%"],
+                ["Fairways Hit (avg)", `${avgFairways}`],
+                ["Greens in Regulation (avg)", `${avgGir}`],
+                ["Scrambling (avg)", `${avgScramble}%`],
+                ["Putting (avg)", avgPutts],
               ].map(([label, value], index) => (
                 <div key={index}>
                   <div className="flex justify-between mb-3">
@@ -133,7 +237,11 @@ export default function Analytics() {
                   <div className="h-4 bg-black/10 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-[#1F4D3A] rounded-full"
-                      style={{ width: value }}
+                      style={{
+                        width: value.includes("%")
+                          ? value
+                          : `${Math.min(Number(value) * 5, 100)}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -149,10 +257,10 @@ export default function Analytics() {
 
             <div className="space-y-8">
               {[
-                ["Workout Consistency", "88%"],
-                ["Strength Progress", "76%"],
-                ["Leg Training", "82%"],
-                ["Recovery Score", "70%"],
+                ["Total Workouts", `${workouts.length}`],
+                ["This Week", `${workoutsThisWeek}`],
+                ["Total Exercises", `${workouts.reduce((s, w) => s + (w.exercises?.length || 0), 0)}`],
+                ["Consistency", rounds.length > 0 && workouts.length > 0 ? "Active" : "—"],
               ].map(([label, value], index) => (
                 <div key={index}>
                   <div className="flex justify-between mb-3">
@@ -163,7 +271,11 @@ export default function Analytics() {
                   <div className="h-4 bg-black/10 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-[#7A1F1F] rounded-full"
-                      style={{ width: value }}
+                      style={{
+                        width: typeof value === "string" && /^\d+$/.test(value)
+                          ? `${Math.min(Number(value) * 10, 100)}%`
+                          : "0%",
+                      }}
                     />
                   </div>
                 </div>
@@ -184,10 +296,13 @@ export default function Analytics() {
           </h2>
 
           <p className="text-white/70 text-lg leading-relaxed mb-8">
-            Your strongest scoring periods occur when you complete at least
-            four gym sessions per week while maintaining recovery before
-            competition rounds. Continue building lower-body strength and
-            focus practice time on approach shots from 120–170 yards.
+            {rounds.length === 0 && workouts.length === 0
+              ? "Start logging rounds and workouts to receive personalised training and practice recommendations."
+              : rounds.length > 0 && workouts.length > 0
+              ? `Your strongest scoring periods occur when you maintain consistent gym sessions. You've logged ${workouts.length} workouts and ${rounds.length} rounds. Keep building lower-body strength and focus practice time on approach shots.`
+              : rounds.length > 0
+              ? `You've logged ${rounds.length} rounds with an average score of ${avgScore}. Start logging workouts to see how gym training affects your golf performance.`
+              : `You've logged ${workouts.length} workouts. Start logging rounds to connect your gym training to your golf performance.`}
           </p>
 
           <div className="bg-white/5 rounded-3xl p-6 border border-white/10">
@@ -196,8 +311,9 @@ export default function Analytics() {
             </h3>
 
             <p className="text-white/70">
-              Reach a 10 handicap by improving GIR above 60% and maintaining
-              workout consistency above 85%.
+              {rounds.length > 0
+                ? `Improve your average score below ${Math.max(Number(avgScore) - 2, 70)} by maintaining workout consistency and focusing on approach play.`
+                : "Log your first round to start tracking your progress toward lower scores."}
             </p>
           </div>
         </section>

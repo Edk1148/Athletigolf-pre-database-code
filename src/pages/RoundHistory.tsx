@@ -1,35 +1,42 @@
-const GOLF_GREEN = "#1F4D3A";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { Round } from "@/lib/types";
 
 export default function RoundHistory() {
-  const rounds = [
-    {
-      course: "Wentworth",
-      score: "78 (+6)",
-      gir: "58%",
-      fir: "64%",
-      putts: 31,
-      comp: true,
-      date: "May 12, 2026",
-    },
-    {
-      course: "St Andrews",
-      score: "82 (+10)",
-      gir: "44%",
-      fir: "61%",
-      putts: 35,
-      comp: false,
-      date: "May 8, 2026",
-    },
-    {
-      course: "Royal Birkdale",
-      score: "76 (+4)",
-      gir: "67%",
-      fir: "71%",
-      putts: 29,
-      comp: true,
-      date: "May 1, 2026",
-    },
-  ];
+  const [rounds, setRounds] = useState<Round[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadRounds();
+  }, []);
+
+  const loadRounds = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("rounds")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setRounds((data as Round[]) || []);
+    setLoading(false);
+  };
+
+  const roundsLogged = rounds.length;
+  const avgScore =
+    rounds.length > 0
+      ? (rounds.reduce((sum, r) => sum + (r.score || 0), 0) / rounds.length).toFixed(1)
+      : "-";
+  const bestRound =
+    rounds.length > 0
+      ? Math.min(...rounds.map((r) => r.score || 999))
+      : "-";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <div className="text-black/40 text-lg">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cream p-8 md:p-12">
@@ -47,94 +54,95 @@ export default function RoundHistory() {
 
           <section className="grid md:grid-cols-4 gap-6 mb-12 mt-10">
             {[
-              ["Rounds Logged", "41"],
-              ["Average Score", "78.6"],
-              ["Best Round", "76"],
-              ["Handicap", "12.4"],
+              ["Rounds Logged", roundsLogged.toString()],
+              ["Average Score", avgScore],
+              ["Best Round", bestRound === 999 ? "-" : bestRound.toString()],
+              ["Handicap", "—"],
             ].map(([label, value], index) => (
               <div
                 key={index}
-                className={`rounded-[2rem] p-6 shadow-sm border border-black/5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ${
-                  index === 0 || index === 3
-                    ? "bg-[#1F4D3A] text-white"
-                    : "bg-[#1F4D3A] text-white"
-                }`}
+                className="bg-[#1F4D3A] text-white rounded-[2rem] p-6 shadow-sm border border-black/5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
-                <p
-                  className={`text-sm mb-3 ${
-                    index === 0 || index === 3
-                      ? "text-white/60"
-                      : "text-white/60"
-                  }`}
-                >
-                  {label}
-                </p>
-
+                <p className="text-sm mb-3 text-white/60">{label}</p>
                 <h2 className="text-4xl font-semibold">{value}</h2>
               </div>
             ))}
           </section>
         </div>
 
-        <div className="grid gap-6">
-          {rounds.map((round, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-[2rem] p-8 shadow-sm border border-black/5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+        {rounds.length === 0 ? (
+          <div className="bg-white rounded-[2rem] p-10 text-center shadow-sm border border-black/5">
+            <h2 className="text-3xl font-semibold mb-3">No rounds yet</h2>
+            <p className="text-black/60 mb-6">
+              Submit your first round to start building your round history.
+            </p>
+            <a
+              href="/golf/submit"
+              className="inline-block bg-[#1F4D3A] text-white px-6 py-3 rounded-full font-medium hover:bg-[#17392b] transition"
             >
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
-                <div className="flex items-center justify-center">
-                  <button className="bg-[#1F4D3A] text-white px-3 py-8 rounded-2xl hover:opacity-90 transition font-medium">
-                    <span
-                      style={{
-                        writingMode: "vertical-rl",
-                        textOrientation: "mixed",
-                      }}
+              Submit Round
+            </a>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {rounds.map((round, index) => (
+              <div
+                key={round.id || index}
+                className="bg-white rounded-[2rem] p-8 shadow-sm border border-black/5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+                  <div className="flex items-center justify-center">
+                    <button className="bg-[#1F4D3A] text-white px-3 py-8 rounded-2xl hover:opacity-90 transition font-medium">
+                      <span
+                        style={{
+                          writingMode: "vertical-rl",
+                          textOrientation: "mixed",
+                        }}
+                      >
+                        DETAILS
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="text-sm text-black/50 mb-2">
+                      {round.date || "—"}
+                    </p>
+
+                    <h2 className="text-3xl font-semibold mb-3">
+                      {round.course || "Unknown Course"}
+                    </h2>
+
+                    <div
+                      className={`inline-block px-4 py-2 rounded-full text-white text-sm ${
+                        round.is_competition ? "bg-orange-400" : "bg-blue-400"
+                      }`}
                     >
-                      DETAILS
-                    </span>
-                  </button>
-                </div>
+                      {round.is_competition ? "Competition Round" : "General Play"}
+                    </div>
+                  </div>
 
-                <div className="flex-1">
-                  <p className="text-sm text-black/50 mb-2">{round.date}</p>
-
-                  <h2 className="text-3xl font-semibold mb-3">
-                    {round.course}
-                  </h2>
-
-                  <div
-                    className={`inline-block px-4 py-2 rounded-full text-white text-sm ${
-                      round.comp ? "bg-orange-400" : "bg-blue-400"
-                    }`}
-                  >
-                    {round.comp ? "Competition Round" : "General Play"}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    {[
+                      ["Score", round.score?.toString() || "—"],
+                      ["GIR", round.greens_in_regulation?.toString() || "—"],
+                      ["FIR", round.fairways_hit?.toString() || "—"],
+                      ["Putts", round.putts?.toString() || "—"],
+                    ].map(([label, value], i) => (
+                      <div
+                        key={i}
+                        className="bg-cream rounded-2xl px-6 py-5 min-w-[120px] border border-[#1F4D3A]/10"
+                      >
+                        <p className="text-sm text-[#1F4D3A]/70 mb-2">{label}</p>
+                        <h3 className="text-2xl font-semibold">{value}</h3>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  {[
-                    ["Score", round.score],
-                    ["GIR", round.gir],
-                    ["FIR", round.fir],
-                    ["Putts", round.putts],
-                  ].map(([label, value], i) => (
-                    <div
-                      key={i}
-                      className="bg-cream rounded-2xl px-6 py-5 min-w-[120px] border border-[#1F4D3A]/10"
-                    >
-                      <p className="text-sm text-[#1F4D3A]/70 mb-2">
-                        {label}
-                      </p>
-
-                      <h3 className="text-2xl font-semibold">{value}</h3>
-                    </div>
-                  ))}
-                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
