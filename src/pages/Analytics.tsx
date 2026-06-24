@@ -36,13 +36,8 @@ export default function Analytics() {
       : "-";
 
   const workoutsThisWeek = (() => {
-    const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return workouts.filter((w) => {
-      if (!w.date) return false;
-      const d = new Date(w.date.split("/").reverse().join("-"));
-      return d >= weekAgo;
-    }).length;
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return workouts.filter((w) => w.created_at && new Date(w.created_at) >= weekAgo).length;
   })();
 
   const avgFairways =
@@ -189,23 +184,24 @@ export default function Analytics() {
             </h2>
           </div>
 
-          {recentScores.length > 0 ? (
-            <div className="grid grid-cols-5 gap-4 items-end h-56">
-              {recentScores.map((score, index) => (
-                <div
-                  key={index}
-                  className="flex flex-col items-center gap-3"
-                >
-                  <div
-                    className="w-full rounded-t-2xl bg-[#1F4D3A]"
-                    style={{ height: `${(100 - score) * 4}px` }}
-                  />
-
-                  <p className="font-semibold">{score}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
+          {recentScores.length > 0 ? (() => {
+            const minScore = Math.min(...recentScores);
+            const maxScore = Math.max(...recentScores);
+            const range = maxScore - minScore || 1;
+            return (
+              <div className="grid gap-4 items-end h-56" style={{ gridTemplateColumns: `repeat(${recentScores.length}, 1fr)` }}>
+                {recentScores.map((score, index) => (
+                  <div key={index} className="flex flex-col items-center gap-3 h-full justify-end">
+                    <p className="font-semibold text-sm">{score}</p>
+                    <div
+                      className="w-full rounded-t-2xl bg-[#1F4D3A] min-h-[24px]"
+                      style={{ height: `${((maxScore - score) / range) * 160 + 24}px` }}
+                    />
+                  </div>
+                ))}
+              </div>
+            );
+          })() : (
             <div className="h-56 flex items-center justify-center text-black/40">
               No rounds logged yet
             </div>
@@ -238,7 +234,9 @@ export default function Analytics() {
                     <div
                       className="h-full bg-[#1F4D3A] rounded-full"
                       style={{
-                        width: value.includes("%")
+                        width: rounds.length === 0
+                          ? "0%"
+                          : value.includes("%")
                           ? value
                           : `${Math.min(Number(value) * 5, 100)}%`,
                       }}

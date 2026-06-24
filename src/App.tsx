@@ -85,7 +85,11 @@ function AppShell() {
           </ProtectedRoute>
         </Route>
 
-<Route path="/gym/history" component={PreviousWorkouts} />
+<Route path="/gym/history">
+  <ProtectedRoute>
+    <PreviousWorkouts />
+  </ProtectedRoute>
+</Route>
 
         <Route path="/workouts/submit">
           <ProtectedRoute>

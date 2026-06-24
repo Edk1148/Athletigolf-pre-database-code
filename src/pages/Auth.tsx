@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function AuthPage() {
   const { signUp, signIn } = useAuth();
+  const [, navigate] = useLocation();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +22,7 @@ export default function AuthPage() {
       } else {
         await signUp(email, password, username);
       }
+      navigate("/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Authentication failed";
       setError(message);
